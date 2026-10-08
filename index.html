@@ -35,11 +35,11 @@
   --toolbar-bg:rgba(238,242,247,.94);
   --card-shadow:0 1px 3px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
 
+  --tag-khac-bg:#f1f5f9;   --tag-khac-fg:#64748b;
   --tag-mamnon-bg:#ffe4e6; --tag-mamnon-fg:#be123c;
   --tag-tieuhoc-bg:#dcfce7; --tag-tieuhoc-fg:#15803d;
   --tag-thcs-bg:#dbeafe;   --tag-thcs-fg:#1d4ed8;
   --tag-thpt-bg:#fef3c7;   --tag-thpt-fg:#b45309;
-  --tag-khac-bg:#f1f5f9;   --tag-khac-fg:#64748b;
   --tag-cls-bg:#f3e8ff;    --tag-cls-fg:#7e22ce;
 
   --danger-bg:#fee2e2; --danger-fg:#dc2626;
@@ -70,11 +70,11 @@ html[data-theme="dark"]{
   --toolbar-bg:rgba(11,18,32,.94);
   --card-shadow:0 1px 3px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.25);
 
+  --tag-khac-bg:#1e2a41;   --tag-khac-fg:#94a3b8;
   --tag-mamnon-bg:#4a1f2b; --tag-mamnon-fg:#fda4af;
   --tag-tieuhoc-bg:#173b2a; --tag-tieuhoc-fg:#86efac;
   --tag-thcs-bg:#1b2c52;   --tag-thcs-fg:#93c5fd;
   --tag-thpt-bg:#3f2f0e;   --tag-thpt-fg:#fcd34d;
-  --tag-khac-bg:#1e2a41;   --tag-khac-fg:#94a3b8;
   --tag-cls-bg:#34204f;    --tag-cls-fg:#d8b4fe;
 
   --danger-bg:#3d1618; --danger-fg:#fca5a5;
@@ -217,11 +217,11 @@ html[data-theme="dark"] select{
 .name{margin:0;font-size:15px;font-weight:700;line-height:1.35;word-break:break-word;color:var(--text)}
 .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .tag{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;line-height:1.5}
+.tag.g-khac{background:var(--tag-khac-bg);color:var(--tag-khac-fg)}
 .tag.g-mamnon{background:var(--tag-mamnon-bg);color:var(--tag-mamnon-fg)}
 .tag.g-tieuhoc{background:var(--tag-tieuhoc-bg);color:var(--tag-tieuhoc-fg)}
 .tag.g-thcs{background:var(--tag-thcs-bg);color:var(--tag-thcs-fg)}
 .tag.g-thpt{background:var(--tag-thpt-bg);color:var(--tag-thpt-fg)}
-.tag.g-khac{background:var(--tag-khac-bg);color:var(--tag-khac-fg)}
 .tag.cls{background:var(--tag-cls-bg);color:var(--tag-cls-fg)}
 
 .card-actions{display:flex;gap:5px;flex:0 0 auto}
@@ -362,6 +362,7 @@ html[data-theme="dark"] .toast{background:#e8eefc;color:#0f172a}
     </select>
     <select id="fGroup">
       <option value="">Tất cả khối</option>
+      <option>Khác</option>
       <option>Mầm non</option>
       <option>Tiểu học</option>
       <option>THCS</option>
@@ -521,7 +522,7 @@ document.getElementById('themeToggle').addEventListener('click', () => {
    ============================================================ */
 const LS_KEY = 'tnnd_bansam_v1';
 const ADDRESSES = ['Thôn Sấm 1','Thôn Sấm 2','Thôn Sấm 3','Thôn Bãi Cả'];
-const GROUPS = ['Mầm non','Tiểu học','THCS','THPT'];
+const GROUPS = ['Khác','Mầm non','Tiểu học','THCS','THPT'];
 
 const ICON_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 const ICON_DEL  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
@@ -529,7 +530,7 @@ const ICON_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 
-/* ---------- Tính tuổi ---------- */
+/* ---------- Tính tuổi (để hiển thị) ---------- */
 function calcAge(iso){
   if(!iso) return null;
   const d = new Date(iso + 'T00:00:00');
@@ -541,23 +542,40 @@ function calcAge(iso){
   return age;
 }
 
-/* ---------- Chia khối THEO NĂM SINH ---------- */
+/* ---------- Chia khối THEO NĂM SINH — tự lên lớp vào tháng 9 ----------
+   Năm học mới bắt đầu từ tháng 9:
+     - Từ tháng 1–8:  dùng năm hiện tại − 1  (vẫn năm học cũ)
+     - Từ tháng 9–12: dùng năm hiện tại      (đã sang năm học mới)
+
+   Phân loại theo khoảng cách năm sinh so với năm học:
+     - 0 – 2 tuổi   → Khác      (nhà trẻ)
+     - 3 – 5 tuổi   → Mầm non
+     - 6 – 10 tuổi  → Tiểu học
+     - 11 – 14 tuổi → THCS
+     - 15+ tuổi     → THPT
+------------------------------------------------------------------------ */
 function groupOf(dobIso){
   if(!dobIso) return 'Khác';
   const y = parseInt(String(dobIso).substring(0,4), 10);
   if(isNaN(y)) return 'Khác';
-  if(y >= 2021) return 'Mầm non';
-  if(y >= 2016) return 'Tiểu học';
-  if(y >= 2012) return 'THCS';
-  return 'THPT';
+
+  const now = new Date();
+  // Tháng 9 = index 8 (0-based). Từ tháng 9 trở đi là năm học mới.
+  const schoolYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+
+  if(y >= schoolYear - 2)  return 'Khác';      // sinh trong 3 năm gần nhất
+  if(y >= schoolYear - 5)  return 'Mầm non';   // 3–5 tuổi
+  if(y >= schoolYear - 10) return 'Tiểu học';  // 6–10 tuổi
+  if(y >= schoolYear - 14) return 'THCS';      // 11–14 tuổi
+  return 'THPT';                                // 15+ tuổi
 }
 function groupClass(g){
   return {
+    'Khác':'g-khac',
     'Mầm non':'g-mamnon',
     'Tiểu học':'g-tieuhoc',
     'THCS':'g-thcs',
-    'THPT':'g-thpt',
-    'Khác':'g-khac'
+    'THPT':'g-thpt'
   }[g] || 'g-khac';
 }
 
@@ -650,7 +668,7 @@ function renderStats(){
   if(fa) filtered = filtered.filter(it => (it.address||'') === fa);
   if(fg) filtered = filtered.filter(it => groupOf(it.dob) === fg);
 
-  const counts = { 'Mầm non':0, 'Tiểu học':0, 'THCS':0, 'THPT':0 };
+  const counts = { 'Khác':0, 'Mầm non':0, 'Tiểu học':0, 'THCS':0, 'THPT':0 };
   filtered.forEach(it => {
     const g = groupOf(it.dob);
     if(counts[g] !== undefined) counts[g]++;
