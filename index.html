@@ -46,9 +46,11 @@ body{
 .stat{
   flex:0 0 auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.22);
   border-radius:13px;padding:8px 13px;min-width:80px;backdrop-filter:blur(6px);
+  transition:background .25s;
 }
+.stat.highlight{background:rgba(255,255,255,.28);border-color:rgba(255,255,255,.45)}
 .stat b{display:block;font-size:18px;line-height:1.15;font-weight:700}
-.stat span{font-size:11px;opacity:.88;white-space:nowrap}
+.stat span{font-size:11px;opacity:.9;white-space:nowrap}
 
 /* ============ TOOLBAR ============ */
 .toolbar{
@@ -114,12 +116,9 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
 .name{margin:0;font-size:15px;font-weight:700;line-height:1.35;word-break:break-word}
 .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .tag{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;line-height:1.5}
-.tag.g-nhatre{background:#fef3c7;color:#b45309}
-.tag.g-mamnon{background:#ffe4e6;color:#be123c}
 .tag.g-tieuhoc{background:#dcfce7;color:#15803d}
 .tag.g-thcs{background:#dbeafe;color:#1d4ed8}
-.tag.g-tren15{background:#f1f5f9;color:#475569}
-.tag.g-chuar{background:#f1f5f9;color:#94a3b8}
+.tag.g-khac{background:#f1f5f9;color:#64748b}
 .tag.cls{background:#f3e8ff;color:#7e22ce}
 
 .card-actions{display:flex;gap:5px;flex:0 0 auto}
@@ -246,12 +245,9 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
     </select>
     <select id="fGroup">
       <option value="">Tất cả khối</option>
-      <option>Nhà trẻ</option>
-      <option>Mầm non</option>
       <option>Tiểu học</option>
       <option>THCS</option>
-      <option>Trên 15</option>
-      <option>Chưa rõ</option>
+      <option>Khác</option>
     </select>
     <select id="fSort">
       <option value="default">Thứ tự mặc định</option>
@@ -382,7 +378,8 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
    ============================================================ */
 const LS_KEY = 'tnnd_bansam_v1';
 const ADDRESSES = ['Thôn Sấm 1','Thôn Sấm 2','Thôn Sấm 3','Thôn Bãi Cả'];
-const GROUPS = ['Nhà trẻ','Mầm non','Tiểu học','THCS','Trên 15','Chưa rõ'];
+/* Chỉ còn 3 nhóm: Tiểu học, THCS, Khác */
+const GROUPS = ['Tiểu học','THCS','Khác'];
 
 const ICON_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 const ICON_DEL  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
@@ -402,16 +399,15 @@ function calcAge(iso){
   return age;
 }
 
-/* ---------- Chia khối theo tuổi ---------- */
+/* ---------- Chia khối theo tuổi (chỉ còn 3 nhóm) ---------- */
 function groupOf(age){
-  if(age === null) return 'Chưa rõ';
-  if(age <= 5)  return 'Mầm non';   // 3–5 tuổi (nhỏ hơn xếp chung Mầm non)
-  if(age <= 10) return 'Tiểu học';  // 6–10
-  if(age <= 15) return 'THCS';      // 11–15
-  return 'Trên 15';
+  if(age === null) return 'Khác';
+  if(age >= 6 && age <= 10) return 'Tiểu học';   // 6–10 tuổi
+  if(age >= 11 && age <= 15) return 'THCS';      // 11–15 tuổi
+  return 'Khác';                                 // mầm non, nhà trẻ, trên 15, chưa rõ
 }
 function groupClass(g){
-  return {'Nhà trẻ':'g-nhatre','Mầm non':'g-mamnon','Tiểu học':'g-tieuhoc','THCS':'g-thcs','Trên 15':'g-tren15','Chưa rõ':'g-chuar'}[g] || 'g-chuar';
+  return { 'Tiểu học':'g-tieuhoc', 'THCS':'g-thcs', 'Khác':'g-khac' }[g] || 'g-khac';
 }
 
 /* ---------- Ngày tháng ---------- */
@@ -493,20 +489,37 @@ function toast(msg){
 }
 
 /* ============================================================
-   THỐNG KÊ
+   THỐNG KÊ — PHẢN ÁNH THEO BỘ LỌC ĐANG CHỌN
    ============================================================ */
 function renderStats(){
-  const counts = {}; GROUPS.forEach(g => counts[g] = 0);
-  data.forEach(it => { counts[groupOf(calcAge(it.dob))]++; });
+  const fa = document.getElementById('fAddress').value;
+  const fg = document.getElementById('fGroup').value;
 
-  const chips = [['Tổng', data.length]];
-  ['Mầm non','Tiểu học','THCS','Trên 15'].forEach(g => {
-    if(counts[g] > 0) chips.push([g, counts[g]]);
+  // Lọc dữ liệu theo bộ lọc đang chọn
+  let filtered = data;
+  if(fa) filtered = filtered.filter(it => (it.address||'') === fa);
+  if(fg) filtered = filtered.filter(it => groupOf(calcAge(it.dob)) === fg);
+
+  // Đếm theo 3 nhóm mới
+  const counts = { 'Tiểu học':0, 'THCS':0, 'Khác':0 };
+  filtered.forEach(it => { counts[groupOf(calcAge(it.dob))]++; });
+
+  // Nhãn "tổng"
+  let totalLabel = 'Tổng';
+  if(fa && fg) totalLabel = `${fa} · ${fg}`;
+  else if(fa) totalLabel = fa;
+  else if(fg) totalLabel = fg;
+
+  // Xây dựng các chip
+  const chips = [[totalLabel, filtered.length, true]];
+  GROUPS.forEach(g => {
+    if(counts[g] > 0) chips.push([g, counts[g], false]);
   });
-  if(counts['Chưa rõ'] > 0) chips.push(['Chưa rõ', counts['Chưa rõ']]);
 
   document.getElementById('stats').innerHTML = chips
-    .map(([label, n]) => `<div class="stat"><b>${n}</b><span>${label}</span></div>`)
+    .map(([label, n, isTotal]) =>
+      `<div class="stat${isTotal?' highlight':''}"><b>${n}</b><span>${label}</span></div>`
+    )
     .join('');
 }
 
@@ -589,7 +602,7 @@ function render(){
           <div class="tags">
             <span class="tag ${groupClass(grp)}">${grp}</span>
             ${it.className ? `<span class="tag cls">Lớp ${esc(it.className)}</span>` : ''}
-            ${it.gender ? `<span class="tag g-chuar">${esc(it.gender)}</span>` : ''}
+            ${it.gender ? `<span class="tag g-khac">${esc(it.gender)}</span>` : ''}
           </div>
         </div>
         <div class="card-actions">
@@ -796,7 +809,6 @@ fileInput.addEventListener('change', e => {
 });
 
 function parseRows(rows){
-  // 1. Tìm dòng tiêu đề
   let headIdx = -1;
   for(let i = 0; i < Math.min(rows.length, 25); i++){
     const r = rows[i] || [];
@@ -804,7 +816,6 @@ function parseRows(rows){
   }
   if(headIdx < 0) return [];
 
-  // 2. Ánh xạ cột
   const map = {};
   (rows[headIdx] || []).forEach((c, i) => {
     const h = String(c).trim().toLowerCase().replace(/\s+/g,' ');
@@ -820,7 +831,6 @@ function parseRows(rows){
   });
   if(map.name == null) map.name = 1;
 
-  // 3. Đọc dữ liệu
   const out = [];
   for(let i = headIdx + 1; i < rows.length; i++){
     const r = rows[i] || [];
