@@ -41,6 +41,8 @@
   --tag-thcs-bg:#dbeafe;   --tag-thcs-fg:#1d4ed8;
   --tag-thpt-bg:#fef3c7;   --tag-thpt-fg:#b45309;
   --tag-cls-bg:#f3e8ff;    --tag-cls-fg:#7e22ce;
+  --tag-nam-bg:#e0f2fe;    --tag-nam-fg:#0369a1;
+  --tag-nu-bg:#fce7f3;     --tag-nu-fg:#be185d;
 
   --danger-bg:#fee2e2; --danger-fg:#dc2626;
 }
@@ -76,6 +78,8 @@ html[data-theme="dark"]{
   --tag-thcs-bg:#1b2c52;   --tag-thcs-fg:#93c5fd;
   --tag-thpt-bg:#3f2f0e;   --tag-thpt-fg:#fcd34d;
   --tag-cls-bg:#34204f;    --tag-cls-fg:#d8b4fe;
+  --tag-nam-bg:#0c2438;    --tag-nam-fg:#7dd3fc;
+  --tag-nu-bg:#3a1526;     --tag-nu-fg:#f9a8d4;
 
   --danger-bg:#3d1618; --danger-fg:#fca5a5;
 }
@@ -223,6 +227,8 @@ html[data-theme="dark"] select{
 .tag.g-thcs{background:var(--tag-thcs-bg);color:var(--tag-thcs-fg)}
 .tag.g-thpt{background:var(--tag-thpt-bg);color:var(--tag-thpt-fg)}
 .tag.cls{background:var(--tag-cls-bg);color:var(--tag-cls-fg)}
+.tag.nam{background:var(--tag-nam-bg);color:var(--tag-nam-fg)}
+.tag.nu{background:var(--tag-nu-bg);color:var(--tag-nu-fg)}
 
 .card-actions{display:flex;gap:5px;flex:0 0 auto}
 .icon-btn{
@@ -360,6 +366,11 @@ html[data-theme="dark"] .toast{background:#e8eefc;color:#0f172a}
       <option>Thôn Sấm 3</option>
       <option>Thôn Bãi Cả</option>
     </select>
+    <select id="fGender">
+      <option value="">Tất cả giới tính</option>
+      <option>Nam</option>
+      <option>Nữ</option>
+    </select>
     <select id="fGroup">
       <option value="">Tất cả khối</option>
       <option>Khác</option>
@@ -367,10 +378,6 @@ html[data-theme="dark"] .toast{background:#e8eefc;color:#0f172a}
       <option>Tiểu học</option>
       <option>THCS</option>
       <option>THPT</option>
-    </select>
-    <select id="fSort">
-      <option value="ageAsc">Tuổi tăng dần</option>
-      <option value="ageDesc">Tuổi giảm dần</option>
     </select>
   </div>
 
@@ -530,7 +537,7 @@ const ICON_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 
-/* ---------- Tính tuổi (để hiển thị) ---------- */
+/* ---------- Tính tuổi ---------- */
 function calcAge(iso){
   if(!iso) return null;
   const d = new Date(iso + 'T00:00:00');
@@ -542,32 +549,20 @@ function calcAge(iso){
   return age;
 }
 
-/* ---------- Chia khối THEO NĂM SINH — tự lên lớp vào tháng 9 ----------
-   Năm học mới bắt đầu từ tháng 9:
-     - Từ tháng 1–8:  dùng năm hiện tại − 1  (vẫn năm học cũ)
-     - Từ tháng 9–12: dùng năm hiện tại      (đã sang năm học mới)
-
-   Phân loại theo khoảng cách năm sinh so với năm học:
-     - 0 – 2 tuổi   → Khác      (nhà trẻ)
-     - 3 – 5 tuổi   → Mầm non
-     - 6 – 10 tuổi  → Tiểu học
-     - 11 – 14 tuổi → THCS
-     - 15+ tuổi     → THPT
------------------------------------------------------------------------- */
+/* ---------- Chia khối THEO NĂM SINH — tự lên lớp vào tháng 9 ---------- */
 function groupOf(dobIso){
   if(!dobIso) return 'Khác';
   const y = parseInt(String(dobIso).substring(0,4), 10);
   if(isNaN(y)) return 'Khác';
 
   const now = new Date();
-  // Tháng 9 = index 8 (0-based). Từ tháng 9 trở đi là năm học mới.
   const schoolYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
 
-  if(y >= schoolYear - 2)  return 'Khác';      // sinh trong 3 năm gần nhất
-  if(y >= schoolYear - 5)  return 'Mầm non';   // 3–5 tuổi
-  if(y >= schoolYear - 10) return 'Tiểu học';  // 6–10 tuổi
-  if(y >= schoolYear - 14) return 'THCS';      // 11–14 tuổi
-  return 'THPT';                                // 15+ tuổi
+  if(y >= schoolYear - 2)  return 'Khác';
+  if(y >= schoolYear - 5)  return 'Mầm non';
+  if(y >= schoolYear - 10) return 'Tiểu học';
+  if(y >= schoolYear - 14) return 'THCS';
+  return 'THPT';
 }
 function groupClass(g){
   return {
@@ -577,6 +572,11 @@ function groupClass(g){
     'THCS':'g-thcs',
     'THPT':'g-thpt'
   }[g] || 'g-khac';
+}
+function genderClass(g){
+  if(g === 'Nam') return 'nam';
+  if(g === 'Nữ')  return 'nu';
+  return 'g-khac';
 }
 
 /* ---------- Ngày tháng ---------- */
@@ -661,12 +661,14 @@ function toast(msg){
    THỐNG KÊ — PHẢN ÁNH THEO BỘ LỌC ĐANG CHỌN
    ============================================================ */
 function renderStats(){
-  const fa = document.getElementById('fAddress').value;
-  const fg = document.getElementById('fGroup').value;
+  const fa  = document.getElementById('fAddress').value;
+  const fge = document.getElementById('fGender').value;
+  const fg  = document.getElementById('fGroup').value;
 
   let filtered = data;
-  if(fa) filtered = filtered.filter(it => (it.address||'') === fa);
-  if(fg) filtered = filtered.filter(it => groupOf(it.dob) === fg);
+  if(fa)  filtered = filtered.filter(it => (it.address||'') === fa);
+  if(fge) filtered = filtered.filter(it => (it.gender||'') === fge);
+  if(fg)  filtered = filtered.filter(it => groupOf(it.dob) === fg);
 
   const counts = { 'Khác':0, 'Mầm non':0, 'Tiểu học':0, 'THCS':0, 'THPT':0 };
   filtered.forEach(it => {
@@ -675,9 +677,11 @@ function renderStats(){
   });
 
   let totalLabel = 'Tổng';
-  if(fa && fg) totalLabel = `${fa} · ${fg}`;
-  else if(fa) totalLabel = fa;
-  else if(fg) totalLabel = fg;
+  const parts = [];
+  if(fa)  parts.push(fa);
+  if(fge) parts.push(fge);
+  if(fg)  parts.push(fg);
+  if(parts.length) totalLabel = parts.join(' · ');
 
   const chips = [[totalLabel, filtered.length, true]];
   GROUPS.forEach(g => {
@@ -692,13 +696,13 @@ function renderStats(){
 }
 
 /* ============================================================
-   LỌC + SẮP XẾP
+   LỌC + SẮP XẾP (cố định: tuổi giảm dần)
    ============================================================ */
 function getView(){
-  const q = document.getElementById('search').value.trim().toLowerCase();
-  const fa = document.getElementById('fAddress').value;
-  const fg = document.getElementById('fGroup').value;
-  const sort = document.getElementById('fSort').value;
+  const q   = document.getElementById('search').value.trim().toLowerCase();
+  const fa  = document.getElementById('fAddress').value;
+  const fge = document.getElementById('fGender').value;
+  const fg  = document.getElementById('fGroup').value;
 
   let list = data.map((it, i) => ({ ...it, _i: i }));
 
@@ -712,21 +716,15 @@ function getView(){
       (it.address||'').toLowerCase().includes(q)
     );
   }
-  if(fa) list = list.filter(it => (it.address||'') === fa);
-  if(fg) list = list.filter(it => groupOf(it.dob) === fg);
+  if(fa)  list = list.filter(it => (it.address||'') === fa);
+  if(fge) list = list.filter(it => (it.gender||'') === fge);
+  if(fg)  list = list.filter(it => groupOf(it.dob) === fg);
 
-  if(sort === 'ageDesc'){
-    list.sort((a,b) => {
-      const A = calcAge(a.dob), B = calcAge(b.dob);
-      return (B === null ? -1 : B) - (A === null ? -1 : A);
-    });
-  }else{
-    // Mặc định: Tuổi tăng dần
-    list.sort((a,b) => {
-      const A = calcAge(a.dob), B = calcAge(b.dob);
-      return (A === null ? 999 : A) - (B === null ? 999 : B);
-    });
-  }
+  // Luôn sắp xếp theo tuổi giảm dần (người lớn tuổi lên trước)
+  list.sort((a,b) => {
+    const A = calcAge(a.dob), B = calcAge(b.dob);
+    return (B === null ? -1 : B) - (A === null ? -1 : A);
+  });
   return list;
 }
 
@@ -765,7 +763,7 @@ function render(){
           <div class="tags">
             <span class="tag ${groupClass(grp)}">${grp}</span>
             ${it.className ? `<span class="tag cls">Lớp ${esc(it.className)}</span>` : ''}
-            ${it.gender ? `<span class="tag g-khac">${esc(it.gender)}</span>` : ''}
+            ${it.gender ? `<span class="tag ${genderClass(it.gender)}">${esc(it.gender)}</span>` : ''}
           </div>
         </div>
         <div class="card-actions">
@@ -886,7 +884,7 @@ document.getElementById('list').addEventListener('click', e => {
 /* ============================================================
    BỘ LỌC
    ============================================================ */
-['search','fAddress','fGroup','fSort'].forEach(id => {
+['search','fAddress','fGender','fGroup'].forEach(id => {
   const el = document.getElementById(id);
   el.addEventListener(id === 'search' ? 'input' : 'change', render);
 });
