@@ -116,8 +116,10 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
 .name{margin:0;font-size:15px;font-weight:700;line-height:1.35;word-break:break-word}
 .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .tag{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;line-height:1.5}
+.tag.g-mamnon{background:#ffe4e6;color:#be123c}
 .tag.g-tieuhoc{background:#dcfce7;color:#15803d}
 .tag.g-thcs{background:#dbeafe;color:#1d4ed8}
+.tag.g-thpt{background:#fef3c7;color:#b45309}
 .tag.g-khac{background:#f1f5f9;color:#64748b}
 .tag.cls{background:#f3e8ff;color:#7e22ce}
 
@@ -245,9 +247,10 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
     </select>
     <select id="fGroup">
       <option value="">Tất cả khối</option>
+      <option>Mầm non</option>
       <option>Tiểu học</option>
       <option>THCS</option>
-      <option>Khác</option>
+      <option>THPT</option>
     </select>
     <select id="fSort">
       <option value="default">Thứ tự mặc định</option>
@@ -378,8 +381,8 @@ select:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.13)}
    ============================================================ */
 const LS_KEY = 'tnnd_bansam_v1';
 const ADDRESSES = ['Thôn Sấm 1','Thôn Sấm 2','Thôn Sấm 3','Thôn Bãi Cả'];
-/* Chỉ còn 3 nhóm: Tiểu học, THCS, Khác */
-const GROUPS = ['Tiểu học','THCS','Khác'];
+/* 4 nhóm khối theo năm sinh */
+const GROUPS = ['Mầm non','Tiểu học','THCS','THPT'];
 
 const ICON_EDIT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
 const ICON_DEL  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
@@ -387,7 +390,7 @@ const ICON_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
 
-/* ---------- Tính tuổi ---------- */
+/* ---------- Tính tuổi (để hiển thị tham khảo) ---------- */
 function calcAge(iso){
   if(!iso) return null;
   const d = new Date(iso + 'T00:00:00');
@@ -399,15 +402,29 @@ function calcAge(iso){
   return age;
 }
 
-/* ---------- Chia khối theo tuổi (chỉ còn 3 nhóm) ---------- */
-function groupOf(age){
-  if(age === null) return 'Khác';
-  if(age >= 6 && age <= 10) return 'Tiểu học';   // 6–10 tuổi
-  if(age >= 11 && age <= 15) return 'THCS';      // 11–15 tuổi
-  return 'Khác';                                 // mầm non, nhà trẻ, trên 15, chưa rõ
+/* ---------- Chia khối THEO NĂM SINH ----------
+   - 2021 trở đi     → Mầm non
+   - 2016 – 2020     → Tiểu học
+   - 2012 – 2015     → THCS
+   - 2011 trở xuống  → THPT
+----------------------------------------------*/
+function groupOf(dobIso){
+  if(!dobIso) return 'Khác';
+  const y = parseInt(String(dobIso).substring(0,4), 10);
+  if(isNaN(y)) return 'Khác';
+  if(y >= 2021) return 'Mầm non';
+  if(y >= 2016) return 'Tiểu học';
+  if(y >= 2012) return 'THCS';
+  return 'THPT';
 }
 function groupClass(g){
-  return { 'Tiểu học':'g-tieuhoc', 'THCS':'g-thcs', 'Khác':'g-khac' }[g] || 'g-khac';
+  return {
+    'Mầm non':'g-mamnon',
+    'Tiểu học':'g-tieuhoc',
+    'THCS':'g-thcs',
+    'THPT':'g-thpt',
+    'Khác':'g-khac'
+  }[g] || 'g-khac';
 }
 
 /* ---------- Ngày tháng ---------- */
@@ -495,22 +512,21 @@ function renderStats(){
   const fa = document.getElementById('fAddress').value;
   const fg = document.getElementById('fGroup').value;
 
-  // Lọc dữ liệu theo bộ lọc đang chọn
   let filtered = data;
   if(fa) filtered = filtered.filter(it => (it.address||'') === fa);
-  if(fg) filtered = filtered.filter(it => groupOf(calcAge(it.dob)) === fg);
+  if(fg) filtered = filtered.filter(it => groupOf(it.dob) === fg);
 
-  // Đếm theo 3 nhóm mới
-  const counts = { 'Tiểu học':0, 'THCS':0, 'Khác':0 };
-  filtered.forEach(it => { counts[groupOf(calcAge(it.dob))]++; });
+  const counts = { 'Mầm non':0, 'Tiểu học':0, 'THCS':0, 'THPT':0 };
+  filtered.forEach(it => {
+    const g = groupOf(it.dob);
+    if(counts[g] !== undefined) counts[g]++;
+  });
 
-  // Nhãn "tổng"
   let totalLabel = 'Tổng';
   if(fa && fg) totalLabel = `${fa} · ${fg}`;
   else if(fa) totalLabel = fa;
   else if(fg) totalLabel = fg;
 
-  // Xây dựng các chip
   const chips = [[totalLabel, filtered.length, true]];
   GROUPS.forEach(g => {
     if(counts[g] > 0) chips.push([g, counts[g], false]);
@@ -545,7 +561,7 @@ function getView(){
     );
   }
   if(fa) list = list.filter(it => (it.address||'') === fa);
-  if(fg) list = list.filter(it => groupOf(calcAge(it.dob)) === fg);
+  if(fg) list = list.filter(it => groupOf(it.dob) === fg);
 
   if(sort === 'name'){
     list.sort((a,b) => (a.name||'').localeCompare(b.name||'','vi'));
@@ -587,7 +603,7 @@ function render(){
 
   box.innerHTML = list.map((it, idx) => {
     const age = calcAge(it.dob);
-    const grp = groupOf(age);
+    const grp = groupOf(it.dob);
     const ageTxt = age === null ? '' : ` · ${age} tuổi`;
     const phoneHtml = it.phone
       ? `<a href="tel:${it.phone}">${it.phone}</a>`
@@ -636,7 +652,7 @@ const dobInput = document.getElementById('dobInput');
 const groupField = document.getElementById('groupField');
 
 function updateGroupField(){
-  groupField.value = groupOf(calcAge(dobInput.value));
+  groupField.value = groupOf(dobInput.value);
 }
 dobInput.addEventListener('change', updateGroupField);
 dobInput.addEventListener('input', updateGroupField);
@@ -749,7 +765,7 @@ document.getElementById('btnExport').onclick = () => {
       it.gender || '',
       it.address || '',
       it.className || '',
-      groupOf(age),
+      groupOf(it.dob),
       age === null ? '' : age,
       it.father || '',
       it.mother || '',
